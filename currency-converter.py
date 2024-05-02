@@ -1,5 +1,6 @@
 import paramiko
 import socket
+import threading
 
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
@@ -12,7 +13,7 @@ conversion_rates = {
 
 class Server(paramiko.ServerInterface):
     def __init__(self):
-        pass
+        self.event = threading.Event()
 
     def check_channel_request(self, kind, chanid):
         if kind == 'session':
@@ -20,14 +21,16 @@ class Server(paramiko.ServerInterface):
         return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
     def check_auth_password(self, username, password):
-        # Allow all authentication attempts
         return paramiko.AUTH_SUCCESSFUL
 
     def check_auth_none(self, username):
-        # Explicitly allow no-authentication login
         return paramiko.AUTH_SUCCESSFUL
 
     def check_channel_shell_request(self, channel):
+        self.event.set()
+        return True
+
+    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
         return True
 
 def handle_client(client_socket):
@@ -48,29 +51,34 @@ def handle_client(client_socket):
         transport.close()
         return
 
+    server.event.wait()  # Wait for the shell request
     try:
         channel.send("Enter amount in USD to convert: ".encode('utf-8'))
+
         while True:
-            f = channel.makefile('rU')
-            amount_str = f.readline().strip()
-            if not amount_str:
-                print("Client has disconnected.")
+            command = channel.recv(1024).decode('utf-8').strip()
+            if not command:
+                print("Connection closed by client.")
                 break
+
             try:
-                amount = float(amount_str)
-                result = 'Conversions:\n'
+                amount = float(command)
+                result = '\r\nConversions:\n'  # Ensure new lines start correctly
                 for currency, rate in conversion_rates.items():
+                    # Format each line to start fresh from the leftmost position
                     converted_amount = amount * rate
-                    result += f'{amount} USD is {converted_amount:.2f} {currency}\n'
+                    result += f'\r{amount} USD is {converted_amount:.2f} {currency}\n'
                 channel.send(result.encode('utf-8'))
-                channel.send("Enter amount in USD to convert: ".encode('utf-8'))
             except ValueError:
-                channel.send('Please enter a valid number.\n'.encode('utf-8'))
+                channel.send('\r\nPlease enter a valid number.\r\n'.encode('utf-8'))
+
+            channel.send("\rEnter amount in USD to convert: ".encode('utf-8'))
     except Exception as e:
         print(f"Caught exception: {str(e)}")
     finally:
         channel.close()
         transport.close()
+
 
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
