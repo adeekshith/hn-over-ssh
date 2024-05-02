@@ -9,6 +9,7 @@ import os
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
 
+story_cache = {}  # Dictionary to cache story details
 
 # Fetch top stories once to minimize API calls and load details on demand
 def fetch_top_stories():
@@ -16,51 +17,91 @@ def fetch_top_stories():
     return response.json()[:200]  # Fetching top 200 story IDs
 
 def fetch_story_details(story_id):
-    response = requests.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json')
-    if response.status_code == 200:
-        return response.json()
-    return None
+    global story_cache
+    if story_id not in story_cache:
+        response = requests.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json')
+        if response.status_code == 200:
+            story_cache[story_id] = response.json()
+        else:
+            story_cache[story_id] = None  # Mark as failed to prevent repeated attempts
+    return story_cache.get(story_id)
 
-def display_stories(channel, top_story_ids, story_cache, cursor_index):
-    try:
-        rows, columns = os.popen('stty size', 'r').read().split()
-        rows = int(rows)
-        page_size = (rows - 6) // 3  # Adjusting page size for multi-line entries
-    except ValueError:
-        page_size = 20  # Default page size if terminal size fetch fails
+
+def display_about_page(channel):
+    clear_screen(channel)
+    about_message = (
+        "\r┌────┬───────┬─────────┬───────┐\n"
+        "\r│ HN │ t top │ a about │ f faq │\n"
+        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r\n"
+        "\rAbout Hacker News Client\n"
+        "\r------------------------\n"
+        "\rDeveloped by: [Your Name]\n"
+        "\rContact: [Your Email]\n"
+        "\rVersion: 1.0.0\n"
+        "\rDescription: This is a custom SSH client for browsing Hacker News interactively.\n"
+        "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
+    )
+    channel.send(about_message.encode('utf-8'))
+
+def display_faq_page(channel):
+    clear_screen(channel)
+    faq_message = (
+        "\r┌────┬───────┬─────────┬───────┐\n"
+        "\r│ HN │ t top │ a about │ f faq │\n"
+        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r\n"
+        "\rFAQ - Frequently Asked Questions\n"
+        "\r--------------------------------\n"
+        "\rQ1: How do I navigate the stories?\n"
+        "\rA1: Use the arrow keys to move up and down through the list of stories.\n"
+        "\r\n"
+        "\rQ2: How can I quit the application?\n"
+        "\rA2: Press 'q' to quit the application at any time.\n"
+        "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
+    )
+    channel.send(faq_message.encode('utf-8'))
+
+
+
+def display_stories(channel, top_story_ids, cursor_index):
+    rows, columns = os.popen('stty size', 'r').read().split()
+    page_size = ((int(rows) // 2) - 9)  # Adjust for top menu and footer and multi line rows
 
     clear_screen(channel)
 
-    # Calculate visible slice of the list based on the cursor position
+    # Top Menu
+    message = (
+        "\r┌────┬───────┬─────────┬───────┐\n"
+        "\r│ HN │ t top │ a about │ f faq │\n"
+        "\r└────┴───────┴─────────┴───────┘\n"
+    )
+
     start_index = max(0, cursor_index - (page_size // 2))
     end_index = min(len(top_story_ids), start_index + page_size)
 
-    message = "\rTop Hacker News Stories:\n"
+    # Stories List
     for i in range(start_index, end_index):
         story_id = top_story_ids[i]
-        story = story_cache.get(story_id, None)
-
-        if story is None:
-            story_cache[story_id] = fetch_story_details(story_id)  # Fetch details if not in cache
-            story = story_cache[story_id]
-
-        if story == "Loading..." or story is None:
-            title = "Loading story details..."
-            url = points = author = time_ago = comments = "Loading..."
-        else:
-            title = story.get('title', 'No title available')
-            url = story.get('url', 'No URL')
-            points = story.get('score', 0)
-            author = story.get('by', 'Unknown')
-            comments = story.get('descendants', 0)
-            time_posted = datetime.datetime.fromtimestamp(story['time'])
-            time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
-
+        story = fetch_story_details(story_id)
+        if not story:  # If still loading or failed to load
+            story = {"title": "Loading...", "url": "#", "score": "Loading...", "by": "Loading...", "descendants": "Loading...", "time": datetime.datetime.now().timestamp()}
+        
+        title = story.get('title', 'No title available')
+        url = story.get('url', '#')
+        points = story.get('score', '0')
+        author = story.get('by', 'Unknown')
+        comments = story.get('descendants', '0')
+        time_posted = datetime.datetime.fromtimestamp(story['time'])
+        time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
+        
         selected = '*' if i == cursor_index else ' '
-        message += f"\n\r{selected}{i + 1}. {title}\n\r    ({url})\n\r    {points} points by {author} {time_ago} | {comments} comments"
+        message += f"\r{selected}{i + 1}. {title} ({url})\n\r    {points} points by {author} {time_ago} | {comments} comments\n"
 
-    message += "\n\r    ────────────────────────────────\n\r         ↑ Up   ↓ Down   q quit"
+    # Footer
+    message += "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
     channel.send(message.encode('utf-8'))
+
 
 
 def handle_client(client_socket):
@@ -83,20 +124,32 @@ def handle_client(client_socket):
     server.event.wait()
 
     top_story_ids = fetch_top_stories()
-    story_cache = {}  # Dictionary to cache story details
     cursor_index = 0
+    current_view = 'top'  # Can be 'top', 'about', 'faq'
 
     try:
         while True:
-            display_stories(channel, top_story_ids, story_cache, cursor_index)
-            inputs = channel.recv(1024).decode('utf-8').strip()
+            if current_view == 'top':
+                display_stories(channel, top_story_ids, cursor_index)
+            elif current_view == 'about':
+                display_about_page(channel)
+            elif current_view == 'faq':
+                display_faq_page(channel)
 
-            if 'Q' in inputs.upper():
+            inputs = channel.recv(1024).decode('utf-8').strip().lower()
+
+            if inputs == 'q':
                 break
-            elif '\x1b[B' in inputs and cursor_index < len(top_story_ids) - 1:  # Down Arrow
-                cursor_index += 1
-            elif '\x1b[A' in inputs and cursor_index > 0:  # Up Arrow
+            elif inputs == 't':
+                current_view = 'top'
+            elif inputs == 'a':
+                current_view = 'about'
+            elif inputs == 'f':
+                current_view = 'faq'
+            elif inputs == '\x1b[a' and current_view == 'top' and cursor_index > 0:  # Up Arrow
                 cursor_index -= 1
+            elif inputs == '\x1b[b' and current_view == 'top' and cursor_index < len(top_story_ids) - 1:  # Down Arrow
+                cursor_index += 1
 
     finally:
         clear_screen(channel)
