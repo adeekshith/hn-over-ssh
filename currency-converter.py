@@ -6,6 +6,7 @@ import humanize
 import datetime
 import os
 import time
+from threading import Lock
 
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
@@ -19,36 +20,52 @@ cache = {
     'stories': {}
 }
 
-story_cache = {}  # Dictionary to cache story details
+cache_lock = Lock()
 
 # Fetch top stories once to minimize API calls and load details on demand
 def fetch_top_stories():
     current_time = time.time()
-    # Check if the cache exists and is still valid (e.g., cache for 10 minutes)
-    if (cache['top_stories']['data'] is not None and 
-        (current_time - cache['top_stories']['timestamp']) < 600):
-        return cache['top_stories']['data']
-    else:
-        response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
-        if response.status_code == 200:
+    
+    with cache_lock:  # Acquire lock to ensure thread-safe access to the cache
+        # Check if cached data is still valid (e.g., cache for 10 minutes)
+        if (cache['top_stories']['data'] is not None and 
+            (current_time - cache['top_stories']['timestamp']) < 600):
+            return cache['top_stories']['data']
+
+    # If the cache is empty or stale, fetch new data
+    response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
+    if response.status_code == 200:
+        with cache_lock:  # Again, ensure thread safety when updating the cache
             # Update cache with new data and current timestamp
             cache['top_stories']['data'] = response.json()[:200]  # Top 200 stories
             cache['top_stories']['timestamp'] = current_time
-            return cache['top_stories']['data']
-        else:
-            # In case of API failure, use old data if available
+        return cache['top_stories']['data']
+    else:
+        # Use old data if it exists when the API call fails, ensuring some data is always available
+        with cache_lock:
             return cache['top_stories']['data'] if cache['top_stories']['data'] is not None else []
 
 
 def fetch_story_details(story_id):
-    global story_cache
-    if story_id not in story_cache:
-        response = requests.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json')
-        if response.status_code == 200:
-            story_cache[story_id] = response.json()
-        else:
-            story_cache[story_id] = None  # Mark as failed to prevent repeated attempts
-    return story_cache.get(story_id)
+    current_time = time.time()
+    
+    with cache_lock:
+        story_cache = cache['stories'].get(story_id, {})
+
+    if story_cache and (current_time - story_cache.get('timestamp', 0) < 900):
+        return story_cache['data']
+    
+    response = requests.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json')
+    if response.status_code == 200:
+        with cache_lock:
+            cache['stories'][story_id] = {
+                'data': response.json(),
+                'timestamp': current_time
+            }
+        return cache['stories'][story_id]['data']
+    else:
+        return story_cache['data'] if story_cache else None
+
 
 
 def display_about_page(channel):
