@@ -53,38 +53,32 @@ class Server(paramiko.ServerInterface):
         return True
 
 
-def display_currency_menu(channel, conversion_rates, selected_currencies, page=0):
-    # Determine terminal size and page size
+def display_currency_menu(channel, conversion_rates, selected_currencies, cursor_index):
     try:
         rows, columns = os.popen('stty size', 'r').read().split()
-        page_size = int(rows) - 5  # Less space for prompts and commands
+        page_size = int(rows) - 5  # Reserve space for headers and commands
     except ValueError:
-        page_size = 20  # Fallback if terminal size can't be determined
+        page_size = 20  # Default page size if terminal size fetch fails
 
-    # Clear the screen and reset cursor
     clear_screen(channel)
 
-    # Generate the list of currencies for current page
-    message = f"Available Currencies (Page {page + 1}):\n"
-    currency_items = list(conversion_rates.items())
-    start_index = page * page_size
-    end_index = min(start_index + page_size, len(currency_items))
+    # Calculating the visible slice of the list based on the cursor position
+    total_items = len(conversion_rates)
+    start_index = max(0, cursor_index - (page_size // 2))
+    end_index = min(total_items, start_index + page_size)
+    if end_index - start_index < page_size and total_items > page_size:  # Adjust start_index if at end of list
+        start_index = total_items - page_size
 
-    for index, (currency, rate) in enumerate(currency_items[start_index:end_index], start=start_index):
-        selected = '*' if currency in selected_currencies else ' '
-        message += f"\r{index + 1}. {currency} ({rate:.4f}) {selected}\n"
+    # Generate the display message with pagination
+    message = f"\rAvailable Currencies:\n"
+    currency_items = list(conversion_rates.items())[start_index:end_index]
 
-    # Navigation controls
-    if page > 0:
-        message += "\n\r[Up Arrow] Previous Page"
-    if end_index < len(currency_items):
-        message += "\n\r[Down Arrow] Next Page"
+    for index, (currency, rate) in enumerate(currency_items, start=start_index):
+        selected = '\r*' if index == cursor_index else '\r '
+        message += f"{selected} {index + 1}. {currency} ({rate:.4f})\n"
 
-    message += "\n\r'C' to convert, 'Q' to quit."
+    message += "\n\rUse [Up Arrow] and [Down Arrow] to navigate, 'C' to convert, 'Q' to quit."
     channel.send(message.encode('utf-8'))
-
-    return start_index, end_index, len(currency_items) > end_index
-
 
 
 def handle_client(client_socket, conversion_rates, popular_currencies):
@@ -107,12 +101,12 @@ def handle_client(client_socket, conversion_rates, popular_currencies):
 
     server.event.wait()
 
-    selected_currencies = popular_currencies[:]
-    current_page = 0
+    cursor_index = 0  # Start cursor at the first item
+    total_items = len(conversion_rates)
 
     try:
         while True:
-            start_index, end_index, more_pages = display_currency_menu(channel, conversion_rates, selected_currencies, current_page)
+            display_currency_menu(channel, conversion_rates, popular_currencies, cursor_index)
             inputs = channel.recv(1024).decode('utf-8').strip()
 
             if 'Q' in inputs.upper():
@@ -122,18 +116,16 @@ def handle_client(client_socket, conversion_rates, popular_currencies):
                 amount_str = channel.recv(1024).decode('utf-8').strip()
                 try:
                     amount = float(amount_str)
-                    result = '\n\rConversions:\n'
-                    for currency in selected_currencies:
-                        rate = conversion_rates[currency]
-                        converted_amount = amount * rate
-                        result += f"\r{amount} USD is {converted_amount:.2f} {currency}\n"
-                    channel.send(result.encode('utf-8'))
+                    currency = list(conversion_rates.items())[cursor_index][0]
+                    rate = conversion_rates[currency]
+                    converted_amount = amount * rate
+                    channel.send(f"\r{amount} USD is {converted_amount:.2f} {currency}\n".encode('utf-8'))
                 except ValueError:
                     channel.send("\rInvalid amount. Please enter a valid number.\n".encode('utf-8'))
-            elif '\x1b[B' in inputs and more_pages:
-                current_page += 1
-            elif '\x1b[A' in inputs and current_page > 0:
-                current_page -= 1
+            elif '\x1b[B' in inputs and cursor_index < total_items - 1:  # Down arrow
+                cursor_index += 1
+            elif '\x1b[A' in inputs and cursor_index > 0:  # Up arrow
+                cursor_index -= 1
 
     finally:
         clear_screen(channel)
