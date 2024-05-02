@@ -25,7 +25,7 @@ def display_stories(channel, top_story_ids, story_cache, cursor_index):
     try:
         rows, columns = os.popen('stty size', 'r').read().split()
         rows = int(rows)
-        page_size = (rows - 5) // 2  # Adjusting page size for multi-line entries
+        page_size = (rows - 6) // 3  # Adjusting page size for multi-line entries
     except ValueError:
         page_size = 20  # Default page size if terminal size fetch fails
 
@@ -57,9 +57,9 @@ def display_stories(channel, top_story_ids, story_cache, cursor_index):
             time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
 
         selected = '*' if i == cursor_index else ' '
-        message += f"\n\r{selected}{i + 1}. {title} ({url})\n\r   {points} points by {author} {time_ago} | {comments} comments"
+        message += f"\n\r{selected}{i + 1}. {title}\n\r    ({url})\n\r    {points} points by {author} {time_ago} | {comments} comments"
 
-    message += "\n\rUse [Up Arrow] and [Down Arrow] to navigate, 'C' to convert, 'Q' to quit."
+    message += "\n\r    ────────────────────────────────\n\r         ↑ Up   ↓ Down   q quit"
     channel.send(message.encode('utf-8'))
 
 
