@@ -10,37 +10,6 @@ import os
 host_key = paramiko.RSAKey.generate(2048)
 
 
-def clear_screen(channel):
-    # Clear the screen and scrollback buffer, then reset cursor position
-    clear_command = "\x1b[3J\x1b[2J\x1b[H".encode('utf-8')
-    channel.send(clear_command)
-    channel.send("".encode('utf-8'))  # Send an empty message to ensure flush
-    channel.send(clear_command)
-
-
-class Server(paramiko.ServerInterface):
-    def __init__(self):
-        self.event = threading.Event()
-
-    def check_channel_request(self, kind, chanid):
-        if kind == 'session':
-            return paramiko.OPEN_SUCCEEDED
-        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
-
-    def check_auth_password(self, username, password):
-        return paramiko.AUTH_SUCCESSFUL
-
-    def check_auth_none(self, username):
-        return paramiko.AUTH_SUCCESSFUL
-
-    def check_channel_shell_request(self, channel):
-        self.event.set()
-        return True
-
-    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
-        return True
-
-
 # Fetch top stories once to minimize API calls and load details on demand
 def fetch_top_stories():
     response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
@@ -55,7 +24,8 @@ def fetch_story_details(story_id):
 def display_stories(channel, top_story_ids, story_cache, cursor_index):
     try:
         rows, columns = os.popen('stty size', 'r').read().split()
-        page_size = int(rows) - 5  # Reserve space for commands
+        rows = int(rows)
+        page_size = (rows - 5) // 2  # Adjusting page size for multi-line entries
     except ValueError:
         page_size = 20  # Default page size if terminal size fetch fails
 
@@ -134,8 +104,36 @@ def handle_client(client_socket):
         transport.close()
 
 
+def clear_screen(channel):
+    # Clear the screen and scrollback buffer, then reset cursor position
+    clear_command = "\x1b[3J\x1b[2J\x1b[H".encode('utf-8')
+    channel.send(clear_command)
+    channel.send("".encode('utf-8'))  # Send an empty message to ensure flush
+    channel.send(clear_command)
 
-# Additional functions to start the server, clear the screen, etc., should remain similar.
+
+class Server(paramiko.ServerInterface):
+    def __init__(self):
+        self.event = threading.Event()
+
+    def check_channel_request(self, kind, chanid):
+        if kind == 'session':
+            return paramiko.OPEN_SUCCEEDED
+        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+    def check_auth_password(self, username, password):
+        return paramiko.AUTH_SUCCESSFUL
+
+    def check_auth_none(self, username):
+        return paramiko.AUTH_SUCCESSFUL
+
+    def check_channel_shell_request(self, channel):
+        self.event.set()
+        return True
+
+    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+        return True
+
 
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
