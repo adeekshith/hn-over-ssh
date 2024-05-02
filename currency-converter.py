@@ -11,6 +11,14 @@ conversion_rates = {
     'GBP': 0.81    # Example rate: 1 USD = 0.81 GBP
 }
 
+def clear_screen(channel):
+    # Clear the screen and scrollback buffer, then reset cursor position
+    clear_command = "\x1b[3J\x1b[2J\x1b[H".encode('utf-8')
+    channel.send(clear_command)
+    channel.send("".encode('utf-8'))  # Send an empty message to ensure flush
+    channel.send(clear_command)
+
+
 class Server(paramiko.ServerInterface):
     def __init__(self):
         self.event = threading.Event()
@@ -52,11 +60,9 @@ def handle_client(client_socket):
         return
 
     server.event.wait()  # Wait for the shell request
+
     try:
-        # Clear the screen, including scrollback buffer, and set cursor at the top
-        channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
-        channel.send("".encode('utf-8'))
-        channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+        clear_screen(channel)  # Clear the screen at the start
         channel.send("Enter amount in USD to convert: ".encode('utf-8'))
 
         while True:
@@ -71,16 +77,10 @@ def handle_client(client_socket):
                 for currency, rate in conversion_rates.items():
                     converted_amount = amount * rate
                     result += f'\r{amount} USD is {converted_amount:.2f} {currency}\n'
-                # Clear the screen and scrollback buffer, reset cursor position
-                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
-                channel.send("".encode('utf-8'))
-                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+                clear_screen(channel)  # Clear before displaying new results
                 channel.send(result.encode('utf-8'))
             except ValueError:
-                # Clear the screen and scrollback buffer, reset cursor position for the error message
-                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
-                channel.send("".encode('utf-8'))
-                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+                clear_screen(channel)  # Clear before displaying the error message
                 channel.send('\r\nPlease enter a valid number.\r\n'.encode('utf-8'))
 
             channel.send("\rEnter amount in USD to convert: ".encode('utf-8'))
