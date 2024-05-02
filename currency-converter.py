@@ -42,7 +42,7 @@ def handle_client(client_socket):
         transport.close()
         return
 
-    channel = transport.accept(20)
+    channel = transport.accept(timeout=20)
     if channel is None:
         print("No channel.")
         transport.close()
@@ -54,6 +54,7 @@ def handle_client(client_socket):
             f = channel.makefile('rU')
             amount_str = f.readline().strip()
             if not amount_str:
+                print("Client has disconnected.")
                 break
             try:
                 amount = float(amount_str)
@@ -71,7 +72,7 @@ def handle_client(client_socket):
         channel.close()
         transport.close()
 
-if __name__ == '__main__':
+def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(('localhost', 2200))
@@ -81,5 +82,9 @@ if __name__ == '__main__':
     while True:
         client, addr = server_socket.accept()
         print(f'Got a connection from {addr[0]}:{addr[1]}')
-        handle_client(client)
+        client_thread = threading.Thread(target=handle_client, args=(client,))
+        client_thread.start()
+
+if __name__ == '__main__':
+    start_server()
 
