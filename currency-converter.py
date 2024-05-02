@@ -5,16 +5,40 @@ import requests
 import humanize
 import datetime
 import os
+import time
 
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
+
+# Global cache to store both story details and top story IDs
+cache = {
+    'top_stories': {
+        'data': None,
+        'timestamp': None
+    },
+    'stories': {}
+}
 
 story_cache = {}  # Dictionary to cache story details
 
 # Fetch top stories once to minimize API calls and load details on demand
 def fetch_top_stories():
-    response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
-    return response.json()[:200]  # Fetching top 200 story IDs
+    current_time = time.time()
+    # Check if the cache exists and is still valid (e.g., cache for 10 minutes)
+    if (cache['top_stories']['data'] is not None and 
+        (current_time - cache['top_stories']['timestamp']) < 600):
+        return cache['top_stories']['data']
+    else:
+        response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
+        if response.status_code == 200:
+            # Update cache with new data and current timestamp
+            cache['top_stories']['data'] = response.json()[:200]  # Top 200 stories
+            cache['top_stories']['timestamp'] = current_time
+            return cache['top_stories']['data']
+        else:
+            # In case of API failure, use old data if available
+            return cache['top_stories']['data'] if cache['top_stories']['data'] is not None else []
+
 
 def fetch_story_details(story_id):
     global story_cache
