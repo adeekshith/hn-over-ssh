@@ -1,15 +1,13 @@
 import paramiko
 import socket
 import threading
+import requests
+import os
 
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
 
-conversion_rates = {
-    'INR': 82.97,  # Example rate: 1 USD = 82.97 INR
-    'EUR': 0.93,   # Example rate: 1 USD = 0.93 EUR
-    'GBP': 0.81    # Example rate: 1 USD = 0.81 GBP
-}
+popular_currencies = ['EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'SEK', 'NZD', 'MXN']
 
 def clear_screen(channel):
     # Clear the screen and scrollback buffer, then reset cursor position
@@ -54,7 +52,42 @@ class Server(paramiko.ServerInterface):
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
         return True
 
-def handle_client(client_socket):
+
+def display_currency_menu(channel, conversion_rates, selected_currencies, page=0):
+    # Determine terminal size and page size
+    try:
+        rows, columns = os.popen('stty size', 'r').read().split()
+        page_size = int(rows) - 5  # Less space for prompts and commands
+    except ValueError:
+        page_size = 20  # Fallback if terminal size can't be determined
+
+    # Clear the screen and reset cursor
+    clear_screen(channel)
+
+    # Generate the list of currencies for current page
+    message = f"Available Currencies (Page {page + 1}):\n"
+    currency_items = list(conversion_rates.items())
+    start_index = page * page_size
+    end_index = min(start_index + page_size, len(currency_items))
+
+    for index, (currency, rate) in enumerate(currency_items[start_index:end_index], start=start_index):
+        selected = '*' if currency in selected_currencies else ' '
+        message += f"\r{index + 1}. {currency} ({rate:.4f}) {selected}\n"
+
+    # Navigation controls
+    if page > 0:
+        message += "\n\r[Up Arrow] Previous Page"
+    if end_index < len(currency_items):
+        message += "\n\r[Down Arrow] Next Page"
+
+    message += "\n\r'C' to convert, 'Q' to quit."
+    channel.send(message.encode('utf-8'))
+
+    return start_index, end_index, len(currency_items) > end_index
+
+
+
+def handle_client(client_socket, conversion_rates, popular_currencies):
     transport = paramiko.Transport(client_socket)
     transport.add_server_key(host_key)
 
@@ -72,37 +105,41 @@ def handle_client(client_socket):
         transport.close()
         return
 
-    server.event.wait()  # Wait for the shell request
+    server.event.wait()
+
+    selected_currencies = popular_currencies[:]
+    current_page = 0
 
     try:
-        clear_screen(channel)  # Clear the screen at the start
-        channel.send("Enter amount in USD to convert: ".encode('utf-8'))
-
         while True:
-            command = channel.recv(1024).decode('utf-8').strip()
-            if not command:
-                print("Connection closed by client.")
+            start_index, end_index, more_pages = display_currency_menu(channel, conversion_rates, selected_currencies, current_page)
+            inputs = channel.recv(1024).decode('utf-8').strip()
+
+            if 'Q' in inputs.upper():
                 break
+            elif 'C' in inputs.upper():
+                channel.send("\rEnter amount in USD to convert: ".encode('utf-8'))
+                amount_str = channel.recv(1024).decode('utf-8').strip()
+                try:
+                    amount = float(amount_str)
+                    result = '\n\rConversions:\n'
+                    for currency in selected_currencies:
+                        rate = conversion_rates[currency]
+                        converted_amount = amount * rate
+                        result += f"\r{amount} USD is {converted_amount:.2f} {currency}\n"
+                    channel.send(result.encode('utf-8'))
+                except ValueError:
+                    channel.send("\rInvalid amount. Please enter a valid number.\n".encode('utf-8'))
+            elif '\x1b[B' in inputs and more_pages:
+                current_page += 1
+            elif '\x1b[A' in inputs and current_page > 0:
+                current_page -= 1
 
-            try:
-                amount = float(command)
-                result = '\r\nConversions:\n'  # Ensure new lines start correctly
-                for currency, rate in conversion_rates.items():
-                    converted_amount = amount * rate
-                    result += f'\r{amount} USD is {converted_amount:.2f} {currency}\n'
-                clear_screen(channel)  # Clear before displaying new results
-                channel.send(result.encode('utf-8'))
-            except ValueError:
-                clear_screen(channel)  # Clear before displaying the error message
-                channel.send('\r\nPlease enter a valid number.\r\n'.encode('utf-8'))
-
-            channel.send("\rEnter amount in USD to convert: ".encode('utf-8'))
-    except Exception as e:
-        print(f"Caught exception: {str(e)}")
     finally:
         clear_screen(channel)
         channel.close()
         transport.close()
+
 
 
 def start_server():
@@ -115,7 +152,7 @@ def start_server():
     while True:
         client, addr = server_socket.accept()
         print(f'Got a connection from {addr[0]}:{addr[1]}')
-        client_thread = threading.Thread(target=handle_client, args=(client,))
+        client_thread = threading.Thread(target=handle_client, args=(client, conversion_rates, popular_currencies))
         client_thread.start()
 
 if __name__ == '__main__':
