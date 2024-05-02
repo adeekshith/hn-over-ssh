@@ -87,6 +87,7 @@ def handle_client(client_socket):
     except Exception as e:
         print(f"Caught exception: {str(e)}")
     finally:
+        clear_screen(channel)
         channel.close()
         transport.close()
 
