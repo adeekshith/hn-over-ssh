@@ -55,6 +55,8 @@ def handle_client(client_socket):
     try:
         # Clear the screen, including scrollback buffer, and set cursor at the top
         channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+        channel.send("".encode('utf-8'))
+        channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
         channel.send("Enter amount in USD to convert: ".encode('utf-8'))
 
         while True:
@@ -71,9 +73,13 @@ def handle_client(client_socket):
                     result += f'\r{amount} USD is {converted_amount:.2f} {currency}\n'
                 # Clear the screen and scrollback buffer, reset cursor position
                 channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+                channel.send("".encode('utf-8'))
+                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
                 channel.send(result.encode('utf-8'))
             except ValueError:
                 # Clear the screen and scrollback buffer, reset cursor position for the error message
+                channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
+                channel.send("".encode('utf-8'))
                 channel.send("\x1b[3J\x1b[2J\x1b[H".encode('utf-8'))
                 channel.send('\r\nPlease enter a valid number.\r\n'.encode('utf-8'))
 
