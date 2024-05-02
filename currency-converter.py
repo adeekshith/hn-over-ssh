@@ -19,6 +19,19 @@ def clear_screen(channel):
     channel.send(clear_command)
 
 
+def fetch_conversion_rates():
+    url = "https://open.er-api.com/v6/latest/USD"
+    response = requests.get(url)
+    data = response.json()
+    if data['result'] == 'success':
+        return data['rates']
+    else:
+        raise Exception("Failed to fetch currency rates")
+
+# Fetch rates when the server starts
+conversion_rates = fetch_conversion_rates()
+
+
 class Server(paramiko.ServerInterface):
     def __init__(self):
         self.event = threading.Event()
