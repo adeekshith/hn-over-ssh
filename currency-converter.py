@@ -2,12 +2,13 @@ import paramiko
 import socket
 import threading
 import requests
+import humanize
+import datetime
 import os
 
 # Set up host key
 host_key = paramiko.RSAKey.generate(2048)
 
-popular_currencies = ['EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'SEK', 'NZD', 'MXN']
 
 def clear_screen(channel):
     # Clear the screen and scrollback buffer, then reset cursor position
@@ -15,19 +16,6 @@ def clear_screen(channel):
     channel.send(clear_command)
     channel.send("".encode('utf-8'))  # Send an empty message to ensure flush
     channel.send(clear_command)
-
-
-def fetch_conversion_rates():
-    url = "https://open.er-api.com/v6/latest/USD"
-    response = requests.get(url)
-    data = response.json()
-    if data['result'] == 'success':
-        return data['rates']
-    else:
-        raise Exception("Failed to fetch currency rates")
-
-# Fetch rates when the server starts
-conversion_rates = fetch_conversion_rates()
 
 
 class Server(paramiko.ServerInterface):
@@ -53,38 +41,61 @@ class Server(paramiko.ServerInterface):
         return True
 
 
-def display_currency_menu(channel, conversion_rates, selected_currencies, cursor_index):
+# Fetch top stories once to minimize API calls and load details on demand
+def fetch_top_stories():
+    response = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json')
+    return response.json()[:200]  # Fetching top 200 story IDs
+
+def fetch_story_details(story_id):
+    response = requests.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json')
+    if response.status_code == 200:
+        return response.json()
+    return None
+
+def display_stories(channel, top_story_ids, story_cache, cursor_index):
     try:
         rows, columns = os.popen('stty size', 'r').read().split()
-        page_size = int(rows) - 5  # Reserve space for headers and commands
+        page_size = int(rows) - 5  # Reserve space for commands
     except ValueError:
         page_size = 20  # Default page size if terminal size fetch fails
 
     clear_screen(channel)
 
-    # Calculating the visible slice of the list based on the cursor position
-    total_items = len(conversion_rates)
+    # Calculate visible slice of the list based on the cursor position
     start_index = max(0, cursor_index - (page_size // 2))
-    end_index = min(total_items, start_index + page_size)
-    if end_index - start_index < page_size and total_items > page_size:  # Adjust start_index if at end of list
-        start_index = total_items - page_size
+    end_index = min(len(top_story_ids), start_index + page_size)
 
-    # Generate the display message with pagination
-    message = f"\rAvailable Currencies:\n"
-    currency_items = list(conversion_rates.items())[start_index:end_index]
+    message = "\rTop Hacker News Stories:\n"
+    for i in range(start_index, end_index):
+        story_id = top_story_ids[i]
+        story = story_cache.get(story_id, None)
 
-    for index, (currency, rate) in enumerate(currency_items, start=start_index):
-        selected = '\r*' if index == cursor_index else '\r '
-        message += f"{selected} {index + 1}. {currency} ({rate:.4f})\n"
+        if story is None:
+            story_cache[story_id] = fetch_story_details(story_id)  # Fetch details if not in cache
+            story = story_cache[story_id]
+
+        if story == "Loading..." or story is None:
+            title = "Loading story details..."
+            url = points = author = time_ago = comments = "Loading..."
+        else:
+            title = story.get('title', 'No title available')
+            url = story.get('url', 'No URL')
+            points = story.get('score', 0)
+            author = story.get('by', 'Unknown')
+            comments = story.get('descendants', 0)
+            time_posted = datetime.datetime.fromtimestamp(story['time'])
+            time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
+
+        selected = '*' if i == cursor_index else ' '
+        message += f"\n\r{selected}{i + 1}. {title} ({url})\n\r   {points} points by {author} {time_ago} | {comments} comments"
 
     message += "\n\rUse [Up Arrow] and [Down Arrow] to navigate, 'C' to convert, 'Q' to quit."
     channel.send(message.encode('utf-8'))
 
 
-def handle_client(client_socket, conversion_rates, popular_currencies):
+def handle_client(client_socket):
     transport = paramiko.Transport(client_socket)
     transport.add_server_key(host_key)
-
     server = Server()
     try:
         transport.start_server(server=server)
@@ -101,30 +112,20 @@ def handle_client(client_socket, conversion_rates, popular_currencies):
 
     server.event.wait()
 
-    cursor_index = 0  # Start cursor at the first item
-    total_items = len(conversion_rates)
+    top_story_ids = fetch_top_stories()
+    story_cache = {}  # Dictionary to cache story details
+    cursor_index = 0
 
     try:
         while True:
-            display_currency_menu(channel, conversion_rates, popular_currencies, cursor_index)
+            display_stories(channel, top_story_ids, story_cache, cursor_index)
             inputs = channel.recv(1024).decode('utf-8').strip()
 
             if 'Q' in inputs.upper():
                 break
-            elif 'C' in inputs.upper():
-                channel.send("\rEnter amount in USD to convert: ".encode('utf-8'))
-                amount_str = channel.recv(1024).decode('utf-8').strip()
-                try:
-                    amount = float(amount_str)
-                    currency = list(conversion_rates.items())[cursor_index][0]
-                    rate = conversion_rates[currency]
-                    converted_amount = amount * rate
-                    channel.send(f"\r{amount} USD is {converted_amount:.2f} {currency}\n".encode('utf-8'))
-                except ValueError:
-                    channel.send("\rInvalid amount. Please enter a valid number.\n".encode('utf-8'))
-            elif '\x1b[B' in inputs and cursor_index < total_items - 1:  # Down arrow
+            elif '\x1b[B' in inputs and cursor_index < len(top_story_ids) - 1:  # Down Arrow
                 cursor_index += 1
-            elif '\x1b[A' in inputs and cursor_index > 0:  # Up arrow
+            elif '\x1b[A' in inputs and cursor_index > 0:  # Up Arrow
                 cursor_index -= 1
 
     finally:
@@ -133,6 +134,8 @@ def handle_client(client_socket, conversion_rates, popular_currencies):
         transport.close()
 
 
+
+# Additional functions to start the server, clear the screen, etc., should remain similar.
 
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -144,7 +147,7 @@ def start_server():
     while True:
         client, addr = server_socket.accept()
         print(f'Got a connection from {addr[0]}:{addr[1]}')
-        client_thread = threading.Thread(target=handle_client, args=(client, conversion_rates, popular_currencies))
+        client_thread = threading.Thread(target=handle_client, args=(client,))
         client_thread.start()
 
 if __name__ == '__main__':
