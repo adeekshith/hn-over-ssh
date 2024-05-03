@@ -1,11 +1,38 @@
 import threading
 import paramiko
+import os
 from .display import display_stories, display_about_page, display_faq_page, display_story_details
 from .api import fetch_top_stories, fetch_story_details
 from .utils import clear_screen
 
+
+def load_or_generate_ssh_key(key_path):
+    """
+    Load an RSA key from a given path, or generate and save a new key if it does not exist.
+    """
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(key_path), exist_ok=True)
+    
+    if os.path.exists(key_path):
+        try:
+            return paramiko.RSAKey(filename=key_path)
+        except IOError as e:
+            print(f"Failed to load existing SSH key due to: {str(e)}. Generating a new key.")
+
+    # Generate a new key and save it if not found or loading failed
+    host_key = paramiko.RSAKey.generate(2048)
+    try:
+        host_key.write_private_key_file(key_path)
+        os.chmod(key_path, 0o600)  # Set file permission to read/write for the owner only
+        print(f"Generated new SSH host key and saved to {key_path}.")
+    except IOError as e:
+        print(f"Failed to save the SSH key to {key_path} due to: {str(e)}")
+    return host_key
+
 # Set up host key
-host_key = paramiko.RSAKey.generate(2048)
+key_file_path = '/etc/ssh/ssh_host_rsa_key'
+host_key = load_or_generate_ssh_key(key_file_path)
+
 
 class Server(paramiko.ServerInterface):
     def __init__(self):
