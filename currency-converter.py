@@ -150,13 +150,17 @@ def display_story_details(channel, story_id):
         story = {"title": "Story details loading failed", "by": "Unknown", "time": time.time(), "score": 0, "url": "#", "text": "No additional information.", "kids": []}
 
     clear_screen(channel)
+    time_posted = datetime.datetime.fromtimestamp(story['time'])
+    time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
     message = (
-        f"\rTitle: {story['title']}\n"
-        f"\rURL: {story['url']}\n"
-        f"\rBy: {story['by']} at {datetime.datetime.fromtimestamp(story['time']).strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"\rScore: {story['score']} points\n"
-        f"\rComments: {story.get('descendants', 0)}\n"
-        f"\rText: {story.get('text', 'No text available.')}\n"
+        "\r┌────┬───────┬─────────┬───────┐\n"
+        "\r│ HN │ t top │ a about │ f faq │\n"
+        "\r└────┴───────┴─────────┴───────┘\n"
+        f"\r{story['title']}\n"
+        f"\r{story.get('url', '')}\n"
+        f"\r{story['score']} points by {story['by']} {time_ago} | {story.get('descendants', 0)} comments\n"
+        f"\r{story.get('text', '')}\n"
+        "\r────────────────────────────────\n"
     )
     channel.send(message.encode('utf-8'))
 
@@ -165,7 +169,7 @@ def display_story_details(channel, story_id):
         for kid_id in story['kids']:
             kid_story = fetch_story_details(kid_id)
             kid_message = (
-                f"\n\rComment by {kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
+                f"\n\r• {kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
             )
             channel.send(kid_message.encode('utf-8'))
     channel.send("\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n".encode('utf-8'))
@@ -205,7 +209,7 @@ def handle_client(client_socket):
                 display_faq_page(channel)
 
             inputs = channel.recv(1024).decode('utf-8')
-            print(repr(inputs))
+            # print(repr(inputs)) # debug
             if inputs.lower() == 'q':
                 break
             elif inputs.lower() == 't' or inputs == '\x1b':
