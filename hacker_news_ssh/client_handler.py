@@ -12,7 +12,7 @@ def load_or_generate_ssh_key(key_path):
     """
     # Ensure the directory exists
     os.makedirs(os.path.dirname(key_path), exist_ok=True)
-    
+
     if os.path.exists(key_path):
         try:
             return paramiko.RSAKey(filename=key_path)
@@ -29,8 +29,9 @@ def load_or_generate_ssh_key(key_path):
         print(f"Failed to save the SSH key to {key_path} due to: {str(e)}")
     return host_key
 
-# Set up host key
-key_file_path = '/etc/ssh/ssh_host_rsa_key'
+# Set up host key using a user-specific directory
+user_home_dir = os.path.expanduser('~')
+key_file_path = os.path.join(user_home_dir, '.ssh', 'ssh_host_rsa_key')
 host_key = load_or_generate_ssh_key(key_file_path)
 
 
