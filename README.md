@@ -5,7 +5,7 @@ Hacker News Over SSH allows users to interact with Hacker News through a termina
 Screencast: https://youtu.be/Qjfih0GYTJk
 
 
-<a href="#"><img src="/docs/media/hn-over-ssh-screenshot.png" alt="image" width="90%" height="auto" /></a>
+<a href="https://youtu.be/Qjfih0GYTJk"><img src="/docs/media/hn-over-ssh-screenshot.png" alt="image" width="90%" height="auto" /></a>
 
 
 ## Features
