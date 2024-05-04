@@ -116,6 +116,7 @@ def display_story_details(channel, story_id):
         f"\r{story['score']} points by {story['by']} {time_ago} | {story.get('descendants', 0)} comments\n"
         f"\r{story.get('text', '')}\n"
         "\r────────────────────────────────\n"
+        "\r (Only shows top level comments for now)\n"
     )
     channel.send(message.encode('utf-8'))
 
@@ -124,7 +125,7 @@ def display_story_details(channel, story_id):
         for kid_id in story['kids']:
             kid_story = fetch_story_details(kid_id)
             kid_message = (
-                f"\n\r• {kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
+                f"\n\r• @{kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
             )
             channel.send(kid_message.encode('utf-8'))
     channel.send("\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n".encode('utf-8'))
