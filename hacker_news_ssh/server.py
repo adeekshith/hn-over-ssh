@@ -5,7 +5,7 @@ from hacker_news_ssh.client_handler import handle_client
 def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind(('localhost', 2200))
+    server_socket.bind(('0.0.0.0', 2200))
     server_socket.listen(100)
     print('Listening for connection ...')
 
