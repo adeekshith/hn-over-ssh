@@ -55,7 +55,16 @@ class Server(paramiko.ServerInterface):
         return True
 
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+        self.terminal_width = width
+        self.terminal_height = height
         return True
+
+    def check_channel_window_change_request(self, channel, width, height, pixelwidth, pixelheight):
+        # Update terminal size when the client resizes their terminal
+        self.terminal_width = width
+        self.terminal_height = height
+        return True
+
 
 def handle_client(client_socket):
     transport = paramiko.Transport(client_socket)
@@ -83,7 +92,7 @@ def handle_client(client_socket):
     try:
         while True:
             if current_view == 'top':
-                display_stories(channel, top_story_ids, cursor_index)
+                display_stories(channel, top_story_ids, cursor_index, server.terminal_width, server.terminal_height)
             elif current_view == 'about':
                 display_about_page(channel)
             elif current_view == 'faq':

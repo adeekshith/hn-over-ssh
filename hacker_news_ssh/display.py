@@ -59,10 +59,10 @@ def display_faq_page(channel):
     channel.send(faq_message.encode('utf-8'))
 
 
-
-def display_stories(channel, top_story_ids, cursor_index):
-    rows, columns = os.popen('stty size', 'r').read().split()
-    page_size = ((int(rows) // 2) - 9)  # Adjust for top menu and footer and multi line rows
+def display_stories(channel, top_story_ids, cursor_index, terminal_width, terminal_height):
+    # Convert string to integers
+    rows, columns = max(terminal_height, 24), max(terminal_width, 80)
+    page_size = ((int(rows) // 2) - 5)  # Adjust for top menu and footer and multi line rows
 
     clear_screen(channel)
 
