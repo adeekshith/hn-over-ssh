@@ -20,7 +20,13 @@ cd hacker-news-over-ssh
 Install required dependencies:
 
 ```
-pip install -r requirements.txt
+# (Optional) Create virtual env
+python -m venv venv
+source venv/bin/activate
+```
+
+```
+pip3 install -r requirements.txt
 ```
 
 ## Usage:
@@ -28,13 +34,13 @@ pip install -r requirements.txt
 Run the server:
 
 ```
-python server.py
+python3 -m hacker_news_ssh.server
 ```
 
 Connect to the server using an SSH client:
 
 ```
-ssh -p 2200 user@host
+ssh -p 2200 localhost
 ```
 
 ## Development
