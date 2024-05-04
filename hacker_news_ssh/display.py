@@ -8,9 +8,9 @@ from hacker_news_ssh.utils import clear_screen
 def display_about_page(channel):
     clear_screen(channel)
     about_message = (
-        "\r┌────┬───────┬─────────┬───────┐\n"
-        "\r│ HN │ t top │ a about │ f faq │\n"
-        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r     ┌────┬───────┬─────────┬───────┐\n"
+        "\r     │ HN │ t top │ a about │ f faq │\n"
+        "\r     └────┴───────┴─────────┴───────┘\n"
         "\r\n"
         "\rWelcome to Hacker News Over SSH\n"
         "\r--------------------------------\n"
@@ -35,7 +35,7 @@ def display_about_page(channel):
         "\rI have also developed projects on the side that have accumulated millions of downloads.\n"
         "\rIf you have or know of relevant opportunities, please let me know!\n"
         "\r\n"
-        "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
+        "\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n"
     )
     channel.send(about_message.encode('utf-8'))
 
@@ -43,18 +43,18 @@ def display_about_page(channel):
 def display_faq_page(channel):
     clear_screen(channel)
     faq_message = (
-        "\r┌────┬───────┬─────────┬───────┐\n"
-        "\r│ HN │ t top │ a about │ f faq │\n"
-        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r     ┌────┬───────┬─────────┬───────┐\n"
+        "\r     │ HN │ t top │ a about │ f faq │\n"
+        "\r     └────┴───────┴─────────┴───────┘\n"
         "\r\n"
         "\rFAQ - Frequently Asked Questions\n"
         "\r--------------------------------\n"
         "\rQ1: How do I navigate the stories?\n"
-        "\rA1: Use the arrow keys to move up and down through the list of stories.\n"
+        "\rA1: Use the arrow keys to move up and down through the list of stories and Esc to go back\n"
         "\r\n"
         "\rQ2: How can I quit the application?\n"
         "\rA2: Press 'q' to quit the application at any time.\n"
-        "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
+        "\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n"
     )
     channel.send(faq_message.encode('utf-8'))
 
@@ -68,9 +68,9 @@ def display_stories(channel, top_story_ids, cursor_index, terminal_width, termin
 
     # Top Menu
     message = (
-        "\r┌────┬───────┬─────────┬───────┐\n"
-        "\r│ HN │ t top │ a about │ f faq │\n"
-        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r     ┌────┬───────┬─────────┬───────┐\n"
+        "\r     │ HN │ t top │ a about │ f faq │\n"
+        "\r     └────┴───────┴─────────┴───────┘\n"
     )
 
     start_index = max(0, cursor_index - (page_size // 2))
@@ -95,7 +95,7 @@ def display_stories(channel, top_story_ids, cursor_index, terminal_width, termin
         message += f"\r{selected}{i + 1}. {title} ({url})\n\r    {points} points by {author} {time_ago} | {comments} comments\n"
 
     # Footer
-    message += "\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n"
+    message += "\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n"
     channel.send(message.encode('utf-8'))
 
 
@@ -108,9 +108,9 @@ def display_story_details(channel, story_id):
     time_posted = datetime.datetime.fromtimestamp(story['time'])
     time_ago = humanize.naturaltime(datetime.datetime.now() - time_posted)
     message = (
-        "\r┌────┬───────┬─────────┬───────┐\n"
-        "\r│ HN │ t top │ a about │ f faq │\n"
-        "\r└────┴───────┴─────────┴───────┘\n"
+        "\r     ┌────┬───────┬─────────┬───────┐\n"
+        "\r     │ HN │ t top │ a about │ f faq │\n"
+        "\r     └────┴───────┴─────────┴───────┘\n"
         f"\r{story['title']}\n"
         f"\r{story.get('url', '')}\n"
         f"\r{story['score']} points by {story['by']} {time_ago} | {story.get('descendants', 0)} comments\n"
@@ -127,6 +127,6 @@ def display_story_details(channel, story_id):
                 f"\n\r• {kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
             )
             channel.send(kid_message.encode('utf-8'))
-    channel.send("\r────────────────────────────────\n\r     ↑ Up   ↓ Down   q quit\n".encode('utf-8'))
+    channel.send("\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n".encode('utf-8'))
 
 
