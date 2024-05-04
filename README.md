@@ -2,6 +2,8 @@
 
 Hacker News Over SSH allows users to interact with Hacker News through a terminal over SSH. This SSH-based client enables browsing Hacker News stories, viewing detailed descriptions, and reading comments in a terminal interface.
 
+Screencast: https://youtu.be/Qjfih0GYTJk
+
 ## Features
 
 - Browse top stories from Hacker News.
