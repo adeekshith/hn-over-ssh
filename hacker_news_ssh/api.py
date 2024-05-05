@@ -1,6 +1,10 @@
-import requests
+"""
+This module interacts with the Hacker News API to fetch and cache top stories and story details.
+"""
+
 import time
 from threading import Lock
+import requests
 
 cache = {
     'top_stories': {
@@ -13,6 +17,7 @@ cache = {
 cache_lock = Lock()
 
 def fetch_top_stories():
+    """Fetch top stories from Hacker News, using cache if available and recent."""
     current_time = time.time()
     with cache_lock:
         if cache['top_stories']['data'] is not None and (current_time - cache['top_stories']['timestamp']) < 600:
@@ -24,10 +29,10 @@ def fetch_top_stories():
             cache['top_stories']['data'] = response.json()[:200]
             cache['top_stories']['timestamp'] = current_time
         return cache['top_stories']['data']
-    else:
-        return []
+    return []
 
 def fetch_story_details(story_id):
+    """Fetch details for a specific story by ID, using cache if available and recent."""
     current_time = time.time()
     with cache_lock:
         story_cache = cache['stories'].get(story_id, {})
@@ -39,6 +44,4 @@ def fetch_story_details(story_id):
         with cache_lock:
             cache['stories'][story_id] = {'data': response.json(), 'timestamp': current_time}
         return cache['stories'][story_id]['data']
-    else:
-        return story_cache['data'] if story_cache else None
-
+    return story_cache['data'] if story_cache else None

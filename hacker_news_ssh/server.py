@@ -1,8 +1,17 @@
+"""
+This module creates and manages a server for the Hacker News SSH service.
+It listens for incoming connections and handles them using a dedicated client handler.
+"""
+
 import socket
 import threading
 from hacker_news_ssh.client_handler import handle_client
 
 def start_server():
+    """
+    Starts the server, listens for incoming connections, and spawns a new thread
+    for each connection to handle client requests.
+    """
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(('0.0.0.0', 2200))
@@ -17,5 +26,3 @@ def start_server():
 
 if __name__ == '__main__':
     start_server()
-
-

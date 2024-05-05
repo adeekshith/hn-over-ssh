@@ -1,11 +1,19 @@
+"""
+This module defines display functions for different pages in a terminal-based
+Hacker News client application. It handles the display of about, FAQ, story listing,
+and story details pages.
+"""
+
 import datetime
-import humanize
-import os
-from hacker_news_ssh.api import fetch_top_stories, fetch_story_details
+from hacker_news_ssh.api import fetch_story_details
 from hacker_news_ssh.utils import clear_screen
+import humanize
 
 
 def display_about_page(channel):
+    """
+    Displays the about page over SSH channel.
+    """
     clear_screen(channel)
     about_message = (
         "\r     ┌────┬───────┬─────────┬───────┐\n"
@@ -41,6 +49,9 @@ def display_about_page(channel):
 
 
 def display_faq_page(channel):
+    """
+    Displays the FAQ page over SSH channel.
+    """
     clear_screen(channel)
     faq_message = (
         "\r     ┌────┬───────┬─────────┬───────┐\n"
@@ -60,9 +71,12 @@ def display_faq_page(channel):
 
 
 def display_stories(channel, top_story_ids, cursor_index, terminal_width, terminal_height):
-    # Convert string to integers
-    rows, columns = max(terminal_height, 24), max(terminal_width, 80)
-    page_size = ((int(rows) // 2) - 5)  # Adjust for top menu and footer and multi line rows
+    """
+    Displays the list of stories over SSH channel based on cursor position and terminal dimensions.
+    """
+    rows = max(terminal_height, 24)  # Convert string to integers, ensure minimum size
+    columns = max(terminal_width, 80)
+    page_size = (rows // 2) - 5  # Adjust for top menu and footer and multi line rows
 
     clear_screen(channel)
 
@@ -79,10 +93,8 @@ def display_stories(channel, top_story_ids, cursor_index, terminal_width, termin
     # Stories List
     for i in range(start_index, end_index):
         story_id = top_story_ids[i]
-        story = fetch_story_details(story_id)
-        if not story:  # If still loading or failed to load
-            story = {"title": "Loading...", "url": "#", "score": "Loading...", "by": "Loading...", "descendants": "Loading...", "time": datetime.datetime.now().timestamp()}
-        
+        story = fetch_story_details(story_id) or {"title": "Loading...", "url": "#", "score": "Loading...", "by": "Loading...", "descendants": "Loading...", "time": datetime.datetime.now().timestamp()}
+
         title = story.get('title', 'No title available')
         url = story.get('url', '#')
         points = story.get('score', '0')
@@ -100,9 +112,10 @@ def display_stories(channel, top_story_ids, cursor_index, terminal_width, termin
 
 
 def display_story_details(channel, story_id):
-    story = fetch_story_details(story_id)
-    if not story:
-        story = {"title": "Story details loading failed", "by": "Unknown", "time": time.time(), "score": 0, "url": "#", "text": "No additional information.", "kids": []}
+    """
+    Displays detailed view of a story over SSH channel.
+    """
+    story = fetch_story_details(story_id) or {"title": "Story details loading failed", "by": "Unknown", "time": datetime.datetime.now().timestamp(), "score": 0, "url": "#", "text": "No additional information.", "kids": []}
 
     clear_screen(channel)
     time_posted = datetime.datetime.fromtimestamp(story['time'])
@@ -124,10 +137,6 @@ def display_story_details(channel, story_id):
     if 'kids' in story and story['kids']:
         for kid_id in story['kids']:
             kid_story = fetch_story_details(kid_id)
-            kid_message = (
-                f"\n\r• @{kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
-            )
+            kid_message = f"\n\r• @{kid_story.get('by', 'Unknown')}: {kid_story.get('text', 'No text available.')}\n"
             channel.send(kid_message.encode('utf-8'))
     channel.send("\r───────────┬──────────┬────────────┬─────────────\n\r     ↑ Up  │  ↓ Down  │  Esc Back  │  q Quit\n".encode('utf-8'))
-
-

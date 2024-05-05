@@ -1,8 +1,12 @@
+"""
+This module handles client connections for a mock SSH server designed to serve Hacker News content.
+"""
+
+import os
 import threading
 import paramiko
-import os
 from .display import display_stories, display_about_page, display_faq_page, display_story_details
-from .api import fetch_top_stories, fetch_story_details
+from .api import fetch_top_stories
 from .utils import clear_screen
 
 
@@ -10,7 +14,6 @@ def load_or_generate_ssh_key(key_path):
     """
     Load an RSA key from a given path, or generate and save a new key if it does not exist.
     """
-    # Ensure the directory exists
     os.makedirs(os.path.dirname(key_path), exist_ok=True)
 
     if os.path.exists(key_path):
@@ -19,7 +22,6 @@ def load_or_generate_ssh_key(key_path):
         except IOError as e:
             print(f"Failed to load existing SSH key due to: {str(e)}. Generating a new key.")
 
-    # Generate a new key and save it if not found or loading failed
     host_key = paramiko.RSAKey.generate(2048)
     try:
         host_key.write_private_key_file(key_path)
@@ -29,44 +31,66 @@ def load_or_generate_ssh_key(key_path):
         print(f"Failed to save the SSH key to {key_path} due to: {str(e)}")
     return host_key
 
-# Set up host key using a user-specific directory
 user_home_dir = os.path.expanduser('~')
 key_file_path = os.path.join(user_home_dir, '.ssh', 'ssh_host_rsa_key')
 host_key = load_or_generate_ssh_key(key_file_path)
 
 
 class Server(paramiko.ServerInterface):
+    """
+    Custom server interface class that handles channel and authentication requests.
+    """
     def __init__(self):
         self.event = threading.Event()
 
     def check_channel_request(self, kind, chanid):
+        """
+        Determines if a channel request of a specific type should be accepted.
+        """
         if kind == 'session':
             return paramiko.OPEN_SUCCEEDED
         return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
     def check_auth_password(self, username, password):
+        """
+        Authenticates users based on a username and password.
+        """
         return paramiko.AUTH_SUCCESSFUL
 
     def check_auth_none(self, username):
+        """
+        Handles requests for authentication without any credentials.
+        """
         return paramiko.AUTH_SUCCESSFUL
 
     def check_channel_shell_request(self, channel):
+        """
+        Authorizes a shell channel request.
+        """
         self.event.set()
         return True
 
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+        """
+        Handles requests for pseudo-terminal settings.
+        """
         self.terminal_width = width
         self.terminal_height = height
         return True
 
     def check_channel_window_change_request(self, channel, width, height, pixelwidth, pixelheight):
-        # Update terminal size when the client resizes their terminal
+        """
+        Updates terminal size upon receiving a window change request.
+        """
         self.terminal_width = width
         self.terminal_height = height
         return True
 
 
 def handle_client(client_socket):
+    """
+    Manages the SSH connection for a single client, including starting the server and handling user inputs.
+    """
     transport = paramiko.Transport(client_socket)
     transport.add_server_key(host_key)
     server = Server()
@@ -120,4 +144,3 @@ def handle_client(client_socket):
         clear_screen(channel)
         channel.close()
         transport.close()
-
