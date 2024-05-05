@@ -14,6 +14,12 @@ Screencast: https://youtu.be/Qjfih0GYTJk
 - View detailed story information including title, author, score, and URL.
 - Read comments and discussions related to stories.
 
+## Demo
+
+```
+$ ssh hn.parishod.com
+```
+
 ## Installation
 
 Clone this repository:
