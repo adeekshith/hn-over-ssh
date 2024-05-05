@@ -4,6 +4,9 @@ Hacker News Over SSH allows users to interact with Hacker News through a termina
 
 ## Demo
 
+Open your terminal and type the following command:
+
+
 ```
 $ ssh hn.parishod.com
 ```
@@ -57,9 +60,9 @@ ssh -p 2200 localhost
 
 ## Development
 
-To set up a development environment, install the development dependencies:
+It is currently working but not feature complete. Only top level comments are being shown and pagination for comments are not implemented yet. UI layout can be improved as well. Feel free to raise PRs to fix any minor issues but please raise an issue and discuss first if you are planning to implement any major features. Thank you!
 
-```bash
-pip install -r requirements-dev.txt
-```
+## Hire me
+
+I was impacted by recent laid offs and looking for new opportunities. I am open to roles and consulting opportunities. Connect with me on [LinkedIn](https://www.linkedin.com/in/adeekshith) and [Mastodon](https://techhub.social/@dsoft) (`@dsoft@techhub.social`).
 
