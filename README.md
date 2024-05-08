@@ -64,5 +64,5 @@ It is currently working but not feature complete. Only top level comments are be
 
 ## Hire me
 
-I was impacted by recent laid offs and looking for new opportunities. I am open to roles and consulting opportunities. Connect with me on [LinkedIn](https://www.linkedin.com/in/adeekshith) and [Mastodon](https://techhub.social/@dsoft) (`@dsoft@techhub.social`).
+I was looking for new opportunities and open to roles and consulting opportunities. Connect with me on [LinkedIn](https://www.linkedin.com/in/adeekshith) and [Mastodon](https://techhub.social/@dsoft) (`@dsoft@techhub.social`).
 
